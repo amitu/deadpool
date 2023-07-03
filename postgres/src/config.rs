@@ -53,6 +53,8 @@ use super::{Pool, PoolConfig};
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(crate = "serde_1"))]
 pub struct Config {
+    /// See [`tokio_postgres::Config`].
+    pub libpq_style_connection_string: Option<String>,
     /// See [`tokio_postgres::Config::user`].
     pub user: Option<String>,
     /// See [`tokio_postgres::Config::password`].
@@ -114,6 +116,8 @@ pub enum ConfigError {
     DbnameMissing,
     /// This variant is returned if the `dbname` contains an empty string
     DbnameEmpty,
+    /// This variant is returned if the `libpq_style_connection_string` is invalid
+    ConnectionStringInvalid,
 }
 
 impl fmt::Display for ConfigError {
@@ -124,6 +128,9 @@ impl fmt::Display for ConfigError {
                 f,
                 "configuration property \"dbname\" contains an empty string",
             ),
+            Self::ConnectionStringInvalid => {
+                write!(f, "configuration property \"libpq_style_connection_string\" is invalid")
+            }
         }
     }
 }
@@ -180,6 +187,10 @@ impl Config {
     /// the database.
     #[allow(unused_results)]
     pub fn get_pg_config(&self) -> Result<tokio_postgres::Config, ConfigError> {
+        if let Some(ref s) = self.libpq_style_connection_string {
+            use std::str::FromStr;
+            return tokio_postgres::Config::from_str(s).map_err(|_| ConfigError::ConnectionStringInvalid);
+        }
         let mut cfg = tokio_postgres::Config::new();
         if let Some(user) = &self.user {
             cfg.user(user.as_str());
